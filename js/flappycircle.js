@@ -60,9 +60,13 @@ function initFlappyCircle() {
 
 	//////////////////////////
 	//attach event listeners//
-	canvas.addEventListener('click', function(e) {
-		velocity[1] = JUMP;
+	canvas.addEventListener('CanvasResize', function() {
+		canvas.height = document.documentElement.clientHeight-5;
 	});
+
+	function onPress(e) { velocity[1] = JUMP; }
+	canvas.addEventListener('click', onPress);
+	canvas.addEventListener('touchstart', onPress);
 
 	updateCanvas();
 }
