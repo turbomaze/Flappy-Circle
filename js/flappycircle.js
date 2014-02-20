@@ -28,6 +28,7 @@ var G = 0.002; //units/second
 var JUMP = 0.025; //units/second
 var X_VEL = 0.012; //units/second
 var WELCOME_TXT = ['Press to begin', '  a new game'];
+var LOSE_TXT = ['        Score: ', 'Press to try again!'];
 
 /*********************
  * working variables */
@@ -41,6 +42,8 @@ var velocity;
 var screenVelocity;
 var barriers;
 var isRunning;
+var currentScreen; //0 is home, 1 is game, 2 is lose
+var currentScore;
 
 /******************
  * work functions */
@@ -62,7 +65,12 @@ function initFlappyCircle() {
 	//attach event listeners//
 	canvas.addEventListener('CanvasResize', function() {
 		canvas.height = document.documentElement.clientHeight-5;
-		if (!isRunning) drawHomeScreen(); //if the game hasn't started yet
+		if (!isRunning) { //if the game isn't running
+			switch (currentScreen) {
+				case 0: drawHomeScreen(); break;
+				case 2: drawLoseScreen(currentScore); break;
+			}
+		}
 	}); //forcing the canvas's height to the full size of the screen, the 5 is fudge
 
 	function onPress(e) {
@@ -77,6 +85,7 @@ function initFlappyCircle() {
 			pos = [map(startPosAsAFraction[0], 0, 1, xrange[0], xrange[1]),
 				   map(startPosAsAFraction[1], 0, 1, yrange[0], yrange[1])];
 			velocity = [X_VEL, 0]; //units/second, x velocity shouldn't change
+			currentScore = 0;
 
 			/////////////////////
 			//generate barriers//
@@ -86,6 +95,7 @@ function initFlappyCircle() {
 				barriers.push([ai, vertDisp]);
 			}
 
+			currentScreen = 1; //game screen
 			updateCanvas();
 		}
 	}
@@ -94,16 +104,31 @@ function initFlappyCircle() {
 }
 
 function drawHomeScreen() {
-	drawBackground();
+	currentScreen = 0; //home screen
+	drawBackground('#7DC7F5', '#62D162');
 	ctx.fillStyle = 'black';
 	ctx.font = 'bold 72px Arial';
-	//-100 pixels for the width of the text
-	var FUDGES = [230, -30, 70];
+	var FUDGES = [230, 30, 70];
 	for (var ai = 0; ai < WELCOME_TXT.length; ai++) {
 		ctx.fillText(
 			WELCOME_TXT[ai], 
 			canvas.width/2 - FUDGES[0], 
-			canvas.height/2 + FUDGES[1] + ai*FUDGES[2]
+			canvas.height/2 - FUDGES[1] + ai*FUDGES[2]
+		);
+	}
+}
+
+function drawLoseScreen(score) {
+	currentScreen = 2; //lose screen
+	drawBackground('#B50000', 'black');
+	ctx.fillStyle = 'white';
+	ctx.font = 'bold 72px Arial';
+	var FUDGES = [300, 30, 70];
+	for (var ai = 0; ai < LOSE_TXT.length; ai++) {
+		ctx.fillText(
+			(ai === 0) ? LOSE_TXT[ai]+score : LOSE_TXT[ai], 
+			canvas.width/2 - FUDGES[0], 
+			canvas.height/2 - FUDGES[1] + ai*FUDGES[2]
 		);
 	}
 }
@@ -111,7 +136,7 @@ function drawHomeScreen() {
 function updateCanvas() {
 	var startTime = currentTimeMillis();
 	updateCtr += 1;
-	if (updateCtr%drawEvery == 0) drawBackground();
+	if (updateCtr%drawEvery == 0) drawBackground('#7DC7F5', '#62D162');
 
 	////////////////////////////////////////////
 	//move the screen (aka the x and y ranges)//
@@ -131,6 +156,7 @@ function updateCanvas() {
 	var canvasX = map(pos[0], xrange[0], xrange[1], 0, canvas.width);
 	var canvasY = map(pos[1], yrange[0], yrange[1], canvas.height, 0);
 	drawPoint([canvasX, canvasY], flappyCircleRadius, 'maroon');
+	currentScore = Math.floor(pos[0]/barriersEveryXUnits); //flappy circle's score
 
 	/////////////////////
 	//draw the barriers//
@@ -166,7 +192,8 @@ function updateCanvas() {
 		}
 		if (collision) {
 			isRunning = false; //they lost
-			drawHomeScreen();
+			currentScore -= 1; //so their most recently earned point is invalid
+			drawLoseScreen(currentScore);
 			return; //exit the game loop
 		}
 		
@@ -180,10 +207,9 @@ function updateCanvas() {
 
 	//////////////////
 	//draw the score//
-	var score = Math.floor(pos[0]/barriersEveryXUnits); //super easy!
 	ctx.fillStyle = 'white';
 	ctx.font = 'bold 48px Arial';
-	ctx.fillText('Score: '+score, canvas.width-250, canvas.height-50);
+	ctx.fillText('Score: '+currentScore, canvas.width-250, canvas.height-50);
 	
 	/////////////////
 	//call next one//
@@ -207,10 +233,10 @@ function drawPoint(pos, r, color) {
 	ctx.fill();
 }
 
-function drawBackground() {
-	ctx.fillStyle = '#7DC7F5';
+function drawBackground(sky, land) {
+	ctx.fillStyle = sky;
 	ctx.fillRect(0, 0, canvas.width, canvas.height);
-	ctx.fillStyle = '#62D162';
+	ctx.fillStyle = land;
 	var numPixelsForLab = percentBGLand*canvas.height; //30% the height
 	ctx.fillRect(0, canvas.height-numPixelsForLab, canvas.width, numPixelsForLab);
 }
