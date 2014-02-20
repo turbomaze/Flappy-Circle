@@ -1,9 +1,9 @@
 /******************\
 |  Flappy Circle   |
 | @author Anthony  |
-| @version 1.0     |
+| @version 1.1     |
 | @date 2014/02/19 |
-| @edit 2014/02/19 |
+| @edit 2014/02/20 |
 \******************/
 
 /**********
@@ -13,8 +13,10 @@ var prefDimensions = [800, 600];
 var frameRate = 30;
 
 var flappyCircleRadius = 15; //in px
-var barrierOpeningSpace = 0.2; //space of each opening as a percent
+var barrierOpeningSpace = 0.3; //space of each opening as a percent
+var barrierOpeningRange = [0.05, 0.95]; //range of the vertical pos of the space
 var barrierWidth = 100; //width of the barriers in px
+var barriersEveryXUnits = 0.75;
 var startPosAsAFraction = [0.1, 0.5]; //constant location of flappy as a percent
 var percentBGLand = 0.3; //how far the land part of the BG extends
 
@@ -27,6 +29,7 @@ var G = 0.002; //units/second
 var JUMP = 0.025; //units/second
 var X_VEL = 0.012; //units/second
 var WELCOME_TXT = ['Press to begin', '  a new game'];
+var LOSE_TXT = ['        Score: ', 'Press to try again!'];
 
 /*********************
  * working variables */
@@ -40,6 +43,9 @@ var velocity;
 var screenVelocity;
 var barriers;
 var isRunning;
+var currentScreen; //0 is home, 1 is game, 2 is lose
+var clickingEnabled; //to fix accidentally exiting the lose screen
+var currentScore;
 
 /******************
  * work functions */
@@ -52,6 +58,7 @@ function initFlappyCircle() {
 	ctx = canvas.getContext('2d');
 	updateCtr = 0;
 	screenVelocity = [X_VEL, 0]; //never changes
+	clickingEnabled = true;
 
 	///////////////////////
 	//draw the homescreen//
@@ -61,31 +68,46 @@ function initFlappyCircle() {
 	//attach event listeners//
 	canvas.addEventListener('CanvasResize', function() {
 		canvas.height = document.documentElement.clientHeight-5;
-		if (!isRunning) drawHomeScreen(); //if the game hasn't started yet
+		if (!isRunning) { //if the game isn't running
+			switch (currentScreen) {
+				case 0: drawHomeScreen(); break;
+				case 2: drawLoseScreen(currentScore); break;
+			}
+		}
 	}); //forcing the canvas's height to the full size of the screen, the 5 is fudge
 
 	function onPress(e) {
-		if (isRunning) velocity[1] = JUMP;
-		else { //game just started!
-			isRunning = true;
+		if (clickingEnabled) {
+			if (isRunning) velocity[1] = JUMP;
+			else { //game just started!
+				isRunning = true;
 
-			////////////////////////////////
-			//reset all the game variables//
-			xrange = INIT_XRANGE.slice(0);
-			yrange = INIT_YRANGE.slice(0);
-			pos = [map(startPosAsAFraction[0], 0, 1, xrange[0], xrange[1]),
-				   map(startPosAsAFraction[1], 0, 1, yrange[0], yrange[1])];
-			velocity = [X_VEL, 0]; //units/second, x velocity shouldn't change
+				//////////////////////////////
+				//setup the game's variables//
+				xrange = INIT_XRANGE.slice(0);
+				yrange = INIT_YRANGE.slice(0);
+				pos = [map(startPosAsAFraction[0], 0, 1, xrange[0], xrange[1]),
+					   map(startPosAsAFraction[1], 0, 1, yrange[0], yrange[1])];
+				velocity = [X_VEL, 0]; //units/second, x velocity shouldn't change
+				currentScore = 0;
 
-			/////////////////////////
-			//generate the barriers//
-			barriers = []; //[[x position, fraction up on the page] ... []]
-			for (var ai = 1; ai <= 15; ai++) {
-				var vertDisp = getRandReal(0.2, 0.8);
-				barriers.push([0.75*ai, vertDisp]);
+				/////////////////////
+				//generate barriers//
+				barriers = []; //[[x position, fraction up on the page] ... []]
+				var barriersUntil = 2*(xrange[1]-xrange[0]); //starting barriers
+				for (var ai = barriersEveryXUnits; ai < barriersUntil; 
+					 ai+=barriersEveryXUnits) {
+					var vertDisp = getRandReal(
+						barrierOpeningRange[0], barrierOpeningRange[1]
+					);
+					barriers.push([ai, vertDisp]);
+				}
+
+				currentScreen = 1; //game screen
+				updateCanvas();
 			}
-
-			updateCanvas();
+		} else {
+			clickingEnabled = true; //so the next click will enter the above if
 		}
 	}
 	canvas.addEventListener('click', onPress);
@@ -93,16 +115,31 @@ function initFlappyCircle() {
 }
 
 function drawHomeScreen() {
-	drawBackground();
+	currentScreen = 0; //home screen
+	drawBackground('#7DC7F5', '#62D162');
 	ctx.fillStyle = 'black';
 	ctx.font = 'bold 72px Arial';
-	//-100 pixels for the width of the text
-	var FUDGES = [230, -30, 70];
+	var FUDGES = [230, 30, 70];
 	for (var ai = 0; ai < WELCOME_TXT.length; ai++) {
 		ctx.fillText(
 			WELCOME_TXT[ai], 
 			canvas.width/2 - FUDGES[0], 
-			canvas.height/2 + FUDGES[1] + ai*FUDGES[2]
+			canvas.height/2 - FUDGES[1] + ai*FUDGES[2]
+		);
+	}
+}
+
+function drawLoseScreen(score) {
+	currentScreen = 2; //lose screen
+	drawBackground('#B50000', 'black');
+	ctx.fillStyle = 'white';
+	ctx.font = 'bold 72px Arial';
+	var FUDGES = [300, 30, 70];
+	for (var ai = 0; ai < LOSE_TXT.length; ai++) {
+		ctx.fillText(
+			(ai === 0) ? LOSE_TXT[ai]+score : LOSE_TXT[ai], 
+			canvas.width/2 - FUDGES[0], 
+			canvas.height/2 - FUDGES[1] + ai*FUDGES[2]
 		);
 	}
 }
@@ -110,7 +147,24 @@ function drawHomeScreen() {
 function updateCanvas() {
 	var startTime = currentTimeMillis();
 	updateCtr += 1;
-	if (updateCtr%drawEvery == 0) drawBackground();
+	if (updateCtr%drawEvery == 0) drawBackground('#7DC7F5', '#62D162');
+
+	///////////////////////////
+	//add and remove barriers//
+	//there aren't any barriers or Flappy Circle is approaching the final barrier
+	var lastBarrier = barriers[barriers.length-1];
+	if (lastBarrier[0] - xrange[1] < 2*(xrange[1] - xrange[0])) { //two windows away
+		var xPos = lastBarrier[0]+barriersEveryXUnits;
+		var vertDisp = getRandReal(
+			barrierOpeningRange[0], barrierOpeningRange[1]
+		);
+		barriers.push([xPos, vertDisp]);
+	}
+	for (var ai = 0; ai < barriers.length; ai++) {
+		if (barriers[ai][0] < xrange[0]-(xrange[1]-xrange[0])) { //too far left
+			barriers.splice(ai, 1); //then remove it
+		}
+	}
 
 	////////////////////////////////////////////
 	//move the screen (aka the x and y ranges)//
@@ -130,10 +184,11 @@ function updateCanvas() {
 	var canvasX = map(pos[0], xrange[0], xrange[1], 0, canvas.width);
 	var canvasY = map(pos[1], yrange[0], yrange[1], canvas.height, 0);
 	drawPoint([canvasX, canvasY], flappyCircleRadius, 'maroon');
+	currentScore = Math.floor(pos[0]/barriersEveryXUnits); //flappy circle's score
 
 	/////////////////////
 	//draw the barriers//
-	var collision = false; //collisions are calculated here
+	var collision = false;
 	var p = (yrange[1]-yrange[0])*barrierOpeningSpace;
 	ctx.fillStyle = 'darkgreen';
 	for (var ai = 0; ai < barriers.length; ai++) {
@@ -148,38 +203,51 @@ function updateCanvas() {
 		var botHalfLength = map(
 			botHalfUpTo, yrange[0], yrange[1], 0, canvas.height
 		); //same for the bottom half
-		var topCornerXPos = map(
-			barriers[ai][0], xrange[0], xrange[1], 0, canvas.width
-		); //their x positions
-		var botHalfYStart = canvas.height - botHalfLength; //where the bot half starts
-
-		//////////////
-		//collisions//
-		//if flappy circle is within the x range of the current barrier
-		if (inRange(canvasX, [topCornerXPos, topCornerXPos+barrierWidth])) {
-			//and it's in the y range of either the top or bottom barrier
-			if (inRange(canvasY, [0, topHalfLength]) || 
-				inRange(canvasY, [botHalfYStart, canvas.height])) {
+		//where the bottom half of the barrier begins vertically
+		var botHalfYStart = canvas.height - botHalfLength;
+		//their x positions
+		var topCornerXPos = map(barriers[ai][0], xrange[0], xrange[1], 0, canvas.width);
+		
+		////////////////////
+		//collision checks//
+		//if flappy circle is within the x range of this barrier
+		if (inRange(canvasX, [topCornerXPos-flappyCircleRadius, 
+							  topCornerXPos+100+flappyCircleRadius])) {
+			//and it's within the y ranges of either the top or the bottom
+			if (inRange(canvasY, [-flappyCircleRadius, 
+								  topHalfLength+flappyCircleRadius]) ||
+				inRange(canvasY, [botHalfYStart-flappyCircleRadius, 
+								  canvas.height+flappyCircleRadius])) {
 				collision = true;
 			}
 		}
 		if (collision) {
-			isRunning = false; //no longer playing
-			drawHomeScreen(); //draw the title screen
-			return; //leave the game loop
+			isRunning = false; //they lost
+			clickingEnabled = false; //prevent rapid lose screen exiting
+			//so their most recently earned point is invalid
+			currentScore -= currentScore === 0 ? 0 : 1; //can't get a negative score
+			drawLoseScreen(currentScore);
+			return; //exit the game loop
 		}
-
-		//draw then
+		
+		/////////////////////
+		//draw the barriers//
 		ctx.fillRect(topCornerXPos, 0, barrierWidth, topHalfLength);
 		ctx.fillRect(
 			topCornerXPos, botHalfYStart, barrierWidth, botHalfLength
 		);
 	}
+
+	//////////////////
+	//draw the score//
+	ctx.fillStyle = 'white';
+	ctx.font = 'bold 48px Arial';
+	ctx.fillText('Score: '+currentScore, canvas.width-250, canvas.height-50);
 	
 	/////////////////
 	//call next one//
-	var timeTaken = currentTimeMillis() - startTime;
-	if (isRunning) { //only if the game is running
+	if (isRunning) { //only if the game is running!
+		var timeTaken = currentTimeMillis() - startTime;
 		if (timeTaken > MS_PER_FRAME) {
 			updateCanvas();
 		} else {
@@ -198,10 +266,10 @@ function drawPoint(pos, r, color) {
 	ctx.fill();
 }
 
-function drawBackground() {
-	ctx.fillStyle = '#7DC7F5';
+function drawBackground(sky, land) {
+	ctx.fillStyle = sky;
 	ctx.fillRect(0, 0, canvas.width, canvas.height);
-	ctx.fillStyle = '#62D162';
+	ctx.fillStyle = land;
 	var numPixelsForLab = percentBGLand*canvas.height; //30% the height
 	ctx.fillRect(0, canvas.height-numPixelsForLab, canvas.width, numPixelsForLab);
 }
@@ -253,7 +321,7 @@ function getRandReal(lower, upper) { //returns number in [lower, upper)
 	return (Math.random()*(upper-lower))+lower;
 }
 
-function inRange(n, range) { //inclusive on both ends
+function inRange(n, range) { //within fudge of either boundary
 	return n >= range[0] && n <= range[1];
 }
 
