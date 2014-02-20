@@ -13,7 +13,8 @@ var prefDimensions = [800, 600];
 var frameRate = 30;
 
 var flappyCircleRadius = 15; //in px
-var barrierOpeningSpace = 0.2; //space of each opening as a percent
+var barrierOpeningSpace = 0.25; //space of each opening as a percent
+var barrierOpeningRange = [0.05, 0.95]; //range of the vertical pos of the space
 var barrierWidth = 100; //width of the barriers in px
 var barriersEveryXUnits = 0.75;
 var startPosAsAFraction = [0.1, 0.5]; //constant location of flappy as a percent
@@ -91,7 +92,9 @@ function initFlappyCircle() {
 			//generate barriers//
 			barriers = []; //[[x position, fraction up on the page] ... []]
 			for (var ai = barriersEveryXUnits; ai < 15; ai+=barriersEveryXUnits) {
-				var vertDisp = getRandReal(0.2, 0.8);
+				var vertDisp = getRandReal(
+					barrierOpeningRange[0], barrierOpeningRange[1]
+				);
 				barriers.push([ai, vertDisp]);
 			}
 
@@ -183,16 +186,20 @@ function updateCanvas() {
 		////////////////////
 		//collision checks//
 		//if flappy circle is within the x range of this barrier
-		if (inRange(canvasX, [topCornerXPos, topCornerXPos+100])) {
+		if (inRange(canvasX, [topCornerXPos-flappyCircleRadius, 
+							  topCornerXPos+100+flappyCircleRadius])) {
 			//and it's within the y ranges of either the top or the bottom
-			if (inRange(canvasY, [0, topHalfLength]) ||
-				inRange(canvasY, [botHalfYStart, canvas.height])) {
+			if (inRange(canvasY, [-flappyCircleRadius, 
+								  topHalfLength+flappyCircleRadius]) ||
+				inRange(canvasY, [botHalfYStart-flappyCircleRadius, 
+								  canvas.height+flappyCircleRadius])) {
 				collision = true;
 			}
 		}
 		if (collision) {
 			isRunning = false; //they lost
-			currentScore -= 1; //so their most recently earned point is invalid
+			//so their most recently earned point is invalid
+			currentScore -= currentScore === 0 ? 0 : 1; //can't get a negative score
 			drawLoseScreen(currentScore);
 			return; //exit the game loop
 		}
@@ -288,7 +295,7 @@ function getRandReal(lower, upper) { //returns number in [lower, upper)
 	return (Math.random()*(upper-lower))+lower;
 }
 
-function inRange(n, range) {
+function inRange(n, range) { //within fudge of either boundary
 	return n >= range[0] && n <= range[1];
 }
 
