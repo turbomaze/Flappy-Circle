@@ -12,17 +12,20 @@ var drawEvery = 1;
 var prefDimensions = [800, 600];
 var frameRate = 30;
 
-var flappyCircleRadius = 15;
-var startPosAsAFraction = [0.1, 0.5];
-var percentBGLand = 0.3;
+var flappyCircleRadius = 15; //in px
+var barrierOpeningSpace = 0.2; //space of each opening as a percent
+var barrierWidth = 100; //width of the barriers in px
+var startPosAsAFraction = [0.1, 0.5]; //constant location of flappy as a percent
+var percentBGLand = 0.3; //how far the land part of the BG extends
 
 /*************
  * constants */
 var MS_PER_FRAME = 1000/frameRate;
 var XRANGE = [0, 1];
 var YRANGE = [0, 1];
-var G = 0.001; //units/second
-var JUMP = 0.025;
+var G = 0.002; //units/second
+var JUMP = 0.025; //units/second
+var X_VEL = 0.012; //units/second
 
 /*********************
  * working variables */
@@ -31,6 +34,8 @@ var ctx;
 var updateCtr;
 var pos;
 var velocity;
+var screenVelocity;
+var barriers;
 
 /******************
  * work functions */
@@ -44,7 +49,14 @@ function initFlappyCircle() {
 	updateCtr = 0;
 	pos = [map(startPosAsAFraction[0], 0, 1, XRANGE[0], XRANGE[1]),
 		   map(startPosAsAFraction[1], 0, 1, YRANGE[0], YRANGE[1])];
-	velocity = [0, 0]; //units/second
+	console.log(pos);
+	velocity = [X_VEL, 0]; //units/second, x velocity shouldn't change
+	screenVelocity = velocity.slice(0); //never changes
+	barriers = []; //[[x position, fraction up on the page] ... []]
+	for (var ai = 1; ai <= 15; ai++) {
+		var vertDisp = getRandReal(0.2, 0.8);
+		barriers.push([0.75*ai, vertDisp]);
+	}
 
 	//////////////////////////
 	//attach event listeners//
@@ -60,17 +72,51 @@ function updateCanvas() {
 	updateCtr += 1;
 	if (updateCtr%drawEvery == 0) drawBackground();
 
+	////////////////////////////////////////////
+	//move the screen (aka the x and y ranges)//
+	XRANGE[0] += screenVelocity[0]; //x velocity
+	XRANGE[1] += screenVelocity[0];
+	YRANGE[0] += screenVelocity[1]; //y velocity
+	YRANGE[1] += screenVelocity[1];
+
 	///////////////////////////////////
 	//update flappy circle's location//
 	velocity[1] -= G; //gravity
-	pos = arrayAdd(pos, velocity); //apply velocity
+	pos = arrayAdd(pos, velocity); //apply the velocity
 	pos = cap(pos, velocity, [XRANGE, YRANGE]); //can't go off screen
 
 	//////////////////////
 	//draw flappy circle//
 	var canvasX = map(pos[0], XRANGE[0], XRANGE[1], 0, canvas.width);
 	var canvasY = map(pos[1], YRANGE[0], YRANGE[1], canvas.height, 0);
-	drawPoint([canvasX, canvasY], flappyCircleRadius, 'black');
+	drawPoint([canvasX, canvasY], flappyCircleRadius, 'maroon');
+
+	/////////////////////
+	//draw the barriers//
+	ctx.fillStyle = 'darkgreen';
+	var p = (YRANGE[1]-YRANGE[0])*barrierOpeningSpace;
+	for (var ai = 0; ai < barriers.length; ai++) {
+		/////////////////////////////////////////////////
+		//figure out how big the barriers are in pixels//
+		var q = (YRANGE[1]-YRANGE[0])*barriers[ai][1] + YRANGE[0];
+		var topHalfDownTo = YRANGE[0]+q+p/2;
+		var botHalfUpTo = topHalfDownTo-p;
+		var topHalfLength = map(
+			YRANGE[1] - topHalfDownTo, YRANGE[0], YRANGE[1], 0, canvas.height
+		); //length in units of the top half of the barrier
+		var botHalfLength = map(
+			botHalfUpTo, YRANGE[0], YRANGE[1], 0, canvas.height
+		); //same for the bottom half
+
+		//its x position
+		var topCornerXPos = map(barriers[ai][0], XRANGE[0], XRANGE[1], 0, canvas.width);
+		
+		//draw it
+		ctx.fillRect(topCornerXPos, 0, barrierWidth, topHalfLength);
+		ctx.fillRect(
+			topCornerXPos, canvas.height-botHalfLength, barrierWidth, botHalfLength
+		);
+	}
 	
 	/////////////////
 	//call next one//
@@ -124,7 +170,9 @@ function cap(a, b, constraints) { //caps a according to constr and sets b to 0
 		else if (a[ai] > constraints[ai][1]) ret.push(constraints[ai][1]);
 		else ret.push(a[ai]);
 
-		if (ret[ai] !== a[ai]) b[ai] = 0; //if it was capped, zero out b
+		if (ret[ai] !== a[ai]) {
+			b[ai] = screenVelocity[ai]; //capped? then reset b to the screen's vel
+		}
 	}
 	return ret;
 }
@@ -138,7 +186,11 @@ function arrayAdd(a, b) {
 }
 
 function getRandNum(lower, upper) { //returns number in [lower, upper)
-	return Math.floor((Math.random()*(upper-lower))+lower);
+	return Math.floor(getRandReal(lower, upper));
+}
+
+function getRandReal(lower, upper) { //returns number in [lower, upper)
+	return (Math.random()*(upper-lower))+lower;
 }
 
 function tightMap(n, d1, d2, r1, r2) { //enforces boundaries
