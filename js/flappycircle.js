@@ -26,6 +26,7 @@ var YRANGE = [0, 1];
 var G = 0.002; //units/second
 var JUMP = 0.025; //units/second
 var X_VEL = 0.012; //units/second
+var WELCOME_TXT = ['Press to begin', '  a new game'];
 
 /*********************
  * working variables */
@@ -36,6 +37,7 @@ var pos;
 var velocity;
 var screenVelocity;
 var barriers;
+var isRunning;
 
 /******************
  * work functions */
@@ -49,7 +51,6 @@ function initFlappyCircle() {
 	updateCtr = 0;
 	pos = [map(startPosAsAFraction[0], 0, 1, XRANGE[0], XRANGE[1]),
 		   map(startPosAsAFraction[1], 0, 1, YRANGE[0], YRANGE[1])];
-	console.log(pos);
 	velocity = [X_VEL, 0]; //units/second, x velocity shouldn't change
 	screenVelocity = velocity.slice(0); //never changes
 	barriers = []; //[[x position, fraction up on the page] ... []]
@@ -58,17 +59,40 @@ function initFlappyCircle() {
 		barriers.push([0.75*ai, vertDisp]);
 	}
 
+	///////////////////////
+	//draw the homescreen//
+	function drawHomeScreen() {
+		drawBackground();
+		ctx.fillStyle = 'black';
+		ctx.font = 'bold 72px Arial';
+		//-100 pixels for the width of the text
+		var FUDGES = [230, -30, 70];
+		for (var ai = 0; ai < WELCOME_TXT.length; ai++) {
+			ctx.fillText(
+				WELCOME_TXT[ai], 
+				canvas.width/2 - FUDGES[0], 
+				canvas.height/2 + FUDGES[1] + ai*FUDGES[2]
+			);
+		}
+	}
+	drawHomeScreen();
+
 	//////////////////////////
 	//attach event listeners//
 	canvas.addEventListener('CanvasResize', function() {
 		canvas.height = document.documentElement.clientHeight-5;
-	});
+		if (!isRunning) drawHomeScreen(); //if the game hasn't started yet
+	}); //forcing the canvas's height to the full size of the screen, the 5 is fudge
 
-	function onPress(e) { velocity[1] = JUMP; }
+	function onPress(e) {
+		if (isRunning) velocity[1] = JUMP;
+		else { //game just started!
+			isRunning = true;
+			updateCanvas();
+		}
+	}
 	canvas.addEventListener('click', onPress);
 	canvas.addEventListener('touchstart', onPress);
-
-	updateCanvas();
 }
 
 function updateCanvas() {
