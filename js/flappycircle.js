@@ -13,7 +13,7 @@ var prefDimensions = [800, 600];
 var frameRate = 30;
 
 var flappyCircleRadius = 15; //in px
-var barrierOpeningSpace = 0.25; //space of each opening as a percent
+var barrierOpeningSpace = 0.3; //space of each opening as a percent
 var barrierOpeningRange = [0.05, 0.95]; //range of the vertical pos of the space
 var barrierWidth = 100; //width of the barriers in px
 var barriersEveryXUnits = 0.75;
@@ -91,7 +91,9 @@ function initFlappyCircle() {
 			/////////////////////
 			//generate barriers//
 			barriers = []; //[[x position, fraction up on the page] ... []]
-			for (var ai = barriersEveryXUnits; ai < 15; ai+=barriersEveryXUnits) {
+			var barriersUntil = 2*(xrange[1]-xrange[0]); //starting barriers
+			for (var ai = barriersEveryXUnits; ai < barriersUntil; 
+				 ai+=barriersEveryXUnits) {
 				var vertDisp = getRandReal(
 					barrierOpeningRange[0], barrierOpeningRange[1]
 				);
@@ -140,6 +142,24 @@ function updateCanvas() {
 	var startTime = currentTimeMillis();
 	updateCtr += 1;
 	if (updateCtr%drawEvery == 0) drawBackground('#7DC7F5', '#62D162');
+
+	///////////////////////////
+	//add and remove barriers//
+	//there aren't any barriers or Flappy Circle is approaching the final barrier
+	var lastBarrier = barriers[barriers.length-1];
+	if (lastBarrier[0] - xrange[1] < 2*(xrange[1] - xrange[0])) { //two windows away
+		console.log('# Barriers: ' + barriers.length);
+		var xPos = lastBarrier[0]+barriersEveryXUnits;
+		var vertDisp = getRandReal(
+			barrierOpeningRange[0], barrierOpeningRange[1]
+		);
+		barriers.push([xPos, vertDisp]);
+	}
+	for (var ai = 0; ai < barriers.length; ai++) {
+		if (barriers[ai][0] < xrange[0]-(xrange[1]-xrange[0])) { //too far left
+			barriers.splice(ai, 1); //then remove it
+		}
+	}
 
 	////////////////////////////////////////////
 	//move the screen (aka the x and y ranges)//
