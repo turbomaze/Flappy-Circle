@@ -1,7 +1,7 @@
 /******************\
 |  Flappy Circle   |
 | @author Anthony  |
-| @version 0.1     |
+| @version 1.0     |
 | @date 2014/02/19 |
 | @edit 2014/02/19 |
 \******************/
@@ -75,7 +75,7 @@ function initFlappyCircle() {
 			xrange = INIT_XRANGE.slice(0);
 			yrange = INIT_YRANGE.slice(0);
 			pos = [map(startPosAsAFraction[0], 0, 1, xrange[0], xrange[1]),
-			map(startPosAsAFraction[1], 0, 1, yrange[0], yrange[1])];
+				   map(startPosAsAFraction[1], 0, 1, yrange[0], yrange[1])];
 			velocity = [X_VEL, 0]; //units/second, x velocity shouldn't change
 
 			/////////////////////
