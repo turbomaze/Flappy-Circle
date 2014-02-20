@@ -1,7 +1,7 @@
 /******************\
 |  Flappy Circle   |
 | @author Anthony  |
-| @version 0.1     |
+| @version 1.0     |
 | @date 2014/02/19 |
 | @edit 2014/02/19 |
 \******************/
@@ -21,8 +21,8 @@ var percentBGLand = 0.3; //how far the land part of the BG extends
 /*************
  * constants */
 var MS_PER_FRAME = 1000/frameRate;
-var XRANGE = [0, 1];
-var YRANGE = [0, 1];
+var INIT_XRANGE = [0, 1];
+var INIT_YRANGE = [0, 1];
 var G = 0.002; //units/second
 var JUMP = 0.025; //units/second
 var X_VEL = 0.012; //units/second
@@ -33,6 +33,8 @@ var WELCOME_TXT = ['Press to begin', '  a new game'];
 var canvas;
 var ctx;
 var updateCtr;
+var xrange;
+var yrange;
 var pos;
 var velocity;
 var screenVelocity;
@@ -49,32 +51,10 @@ function initFlappyCircle() {
 	canvas.height = prefDimensions[1];
 	ctx = canvas.getContext('2d');
 	updateCtr = 0;
-	pos = [map(startPosAsAFraction[0], 0, 1, XRANGE[0], XRANGE[1]),
-		   map(startPosAsAFraction[1], 0, 1, YRANGE[0], YRANGE[1])];
-	velocity = [X_VEL, 0]; //units/second, x velocity shouldn't change
-	screenVelocity = velocity.slice(0); //never changes
-	barriers = []; //[[x position, fraction up on the page] ... []]
-	for (var ai = 1; ai <= 15; ai++) {
-		var vertDisp = getRandReal(0.2, 0.8);
-		barriers.push([0.75*ai, vertDisp]);
-	}
+	screenVelocity = [X_VEL, 0]; //never changes
 
 	///////////////////////
 	//draw the homescreen//
-	function drawHomeScreen() {
-		drawBackground();
-		ctx.fillStyle = 'black';
-		ctx.font = 'bold 72px Arial';
-		//-100 pixels for the width of the text
-		var FUDGES = [230, -30, 70];
-		for (var ai = 0; ai < WELCOME_TXT.length; ai++) {
-			ctx.fillText(
-				WELCOME_TXT[ai], 
-				canvas.width/2 - FUDGES[0], 
-				canvas.height/2 + FUDGES[1] + ai*FUDGES[2]
-			);
-		}
-	}
 	drawHomeScreen();
 
 	//////////////////////////
@@ -88,11 +68,43 @@ function initFlappyCircle() {
 		if (isRunning) velocity[1] = JUMP;
 		else { //game just started!
 			isRunning = true;
+
+			////////////////////////////////
+			//reset all the game variables//
+			xrange = INIT_XRANGE.slice(0);
+			yrange = INIT_YRANGE.slice(0);
+			pos = [map(startPosAsAFraction[0], 0, 1, xrange[0], xrange[1]),
+				   map(startPosAsAFraction[1], 0, 1, yrange[0], yrange[1])];
+			velocity = [X_VEL, 0]; //units/second, x velocity shouldn't change
+
+			/////////////////////////
+			//generate the barriers//
+			barriers = []; //[[x position, fraction up on the page] ... []]
+			for (var ai = 1; ai <= 15; ai++) {
+				var vertDisp = getRandReal(0.2, 0.8);
+				barriers.push([0.75*ai, vertDisp]);
+			}
+
 			updateCanvas();
 		}
 	}
 	canvas.addEventListener('click', onPress);
 	canvas.addEventListener('touchstart', onPress);
+}
+
+function drawHomeScreen() {
+	drawBackground();
+	ctx.fillStyle = 'black';
+	ctx.font = 'bold 72px Arial';
+	//-100 pixels for the width of the text
+	var FUDGES = [230, -30, 70];
+	for (var ai = 0; ai < WELCOME_TXT.length; ai++) {
+		ctx.fillText(
+			WELCOME_TXT[ai], 
+			canvas.width/2 - FUDGES[0], 
+			canvas.height/2 + FUDGES[1] + ai*FUDGES[2]
+		);
+	}
 }
 
 function updateCanvas() {
@@ -102,57 +114,77 @@ function updateCanvas() {
 
 	////////////////////////////////////////////
 	//move the screen (aka the x and y ranges)//
-	XRANGE[0] += screenVelocity[0]; //x velocity
-	XRANGE[1] += screenVelocity[0];
-	YRANGE[0] += screenVelocity[1]; //y velocity
-	YRANGE[1] += screenVelocity[1];
+	xrange[0] += screenVelocity[0]; //x velocity
+	xrange[1] += screenVelocity[0];
+	yrange[0] += screenVelocity[1]; //y velocity
+	yrange[1] += screenVelocity[1];
 
 	///////////////////////////////////
 	//update flappy circle's location//
 	velocity[1] -= G; //gravity
 	pos = arrayAdd(pos, velocity); //apply the velocity
-	pos = cap(pos, velocity, [XRANGE, YRANGE]); //can't go off screen
+	pos = cap(pos, velocity, [xrange, yrange]); //can't go off screen
 
 	//////////////////////
 	//draw flappy circle//
-	var canvasX = map(pos[0], XRANGE[0], XRANGE[1], 0, canvas.width);
-	var canvasY = map(pos[1], YRANGE[0], YRANGE[1], canvas.height, 0);
+	var canvasX = map(pos[0], xrange[0], xrange[1], 0, canvas.width);
+	var canvasY = map(pos[1], yrange[0], yrange[1], canvas.height, 0);
 	drawPoint([canvasX, canvasY], flappyCircleRadius, 'maroon');
 
 	/////////////////////
 	//draw the barriers//
+	var collision = false; //collisions are calculated here
+	var p = (yrange[1]-yrange[0])*barrierOpeningSpace;
 	ctx.fillStyle = 'darkgreen';
-	var p = (YRANGE[1]-YRANGE[0])*barrierOpeningSpace;
 	for (var ai = 0; ai < barriers.length; ai++) {
 		/////////////////////////////////////////////////
 		//figure out how big the barriers are in pixels//
-		var q = (YRANGE[1]-YRANGE[0])*barriers[ai][1] + YRANGE[0];
-		var topHalfDownTo = YRANGE[0]+q+p/2;
+		var q = (yrange[1]-yrange[0])*barriers[ai][1] + yrange[0];
+		var topHalfDownTo = yrange[0]+q+p/2;
 		var botHalfUpTo = topHalfDownTo-p;
 		var topHalfLength = map(
-			YRANGE[1] - topHalfDownTo, YRANGE[0], YRANGE[1], 0, canvas.height
+			yrange[1] - topHalfDownTo, yrange[0], yrange[1], 0, canvas.height
 		); //length in units of the top half of the barrier
 		var botHalfLength = map(
-			botHalfUpTo, YRANGE[0], YRANGE[1], 0, canvas.height
+			botHalfUpTo, yrange[0], yrange[1], 0, canvas.height
 		); //same for the bottom half
+		var topCornerXPos = map(
+			barriers[ai][0], xrange[0], xrange[1], 0, canvas.width
+		); //their x positions
+		var botHalfYStart = canvas.height - botHalfLength; //where the bot half starts
 
-		//its x position
-		var topCornerXPos = map(barriers[ai][0], XRANGE[0], XRANGE[1], 0, canvas.width);
-		
-		//draw it
+		//////////////
+		//collisions//
+		//if flappy circle is within the x range of the current barrier
+		if (inRange(canvasX, [topCornerXPos, topCornerXPos+barrierWidth])) {
+			//and it's in the y range of either the top or bottom barrier
+			if (inRange(canvasY, [0, topHalfLength]) || 
+				inRange(canvasY, [botHalfYStart, canvas.height])) {
+				collision = true;
+			}
+		}
+		if (collision) {
+			isRunning = false; //no longer playing
+			drawHomeScreen(); //draw the title screen
+			return; //leave the game loop
+		}
+
+		//draw then
 		ctx.fillRect(topCornerXPos, 0, barrierWidth, topHalfLength);
 		ctx.fillRect(
-			topCornerXPos, canvas.height-botHalfLength, barrierWidth, botHalfLength
+			topCornerXPos, botHalfYStart, barrierWidth, botHalfLength
 		);
 	}
 	
 	/////////////////
 	//call next one//
 	var timeTaken = currentTimeMillis() - startTime;
-	if (timeTaken > MS_PER_FRAME) {
-		updateCanvas();
-	} else {
-		setTimeout(function(){updateCanvas();}, MS_PER_FRAME - timeTaken);
+	if (isRunning) { //only if the game is running
+		if (timeTaken > MS_PER_FRAME) {
+			updateCanvas();
+		} else {
+			setTimeout(function(){updateCanvas();}, MS_PER_FRAME - timeTaken);
+		}
 	}
 }
 
@@ -219,6 +251,10 @@ function getRandNum(lower, upper) { //returns number in [lower, upper)
 
 function getRandReal(lower, upper) { //returns number in [lower, upper)
 	return (Math.random()*(upper-lower))+lower;
+}
+
+function inRange(n, range) { //inclusive on both ends
+	return n >= range[0] && n <= range[1];
 }
 
 function tightMap(n, d1, d2, r1, r2) { //enforces boundaries
