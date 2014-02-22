@@ -10,7 +10,6 @@
  * config */
 var drawEvery = 1;
 var frameRate = 30;
-var prefDimensions = [800, 600];
 
 var barrierOpeningSpace = 0.3; //space of each opening as a percent
 var barriersEveryXUnits = 0.45; //how often a barrier appears
@@ -35,7 +34,7 @@ var flappyCircleRadius = 0.025; //in units
 var startPosAsAFraction = [0.05, 0.5]; //constant location of flappy in units
 var percentBGLand = 0.3; //how far the land part of the BG extends
 
-var fontSize = 0.1; //as a percent of the screen's height
+var fontSize = 0.08; //as a percent of the screen's height
 
 var WELCOME_TXT = ['Press to begin', 'a new game'];
 var LOSE_TXT = ['Score: ', 'Press to try again!'];
@@ -70,8 +69,7 @@ function initFlappyCircle() {
 	////////////////////////////////
 	//initialize working variables//
 	canvas = $('#canvas');
-	canvas.width = prefDimensions[0];
-	canvas.height = prefDimensions[1];
+	FastClick.attach(canvas);
 	ctx = canvas.getContext('2d');
 	updateCtr = 0;
 	xrange = INIT_XRANGE.slice(0);
@@ -85,8 +83,8 @@ function initFlappyCircle() {
 
 	//////////////////////////
 	//attach event listeners//
+
 	canvas.addEventListener('CanvasResize', function() {
-		canvas.height = document.documentElement.clientHeight-5;
 		//change the x range to accomodate the change in dimensions
 		var u = (canvas.width/canvas.height)*(9/16);
 		xrange[1] = xrange[0] + u;
@@ -136,8 +134,8 @@ function initFlappyCircle() {
 			clickingEnabled = true; //so the next click will enter the above if
 		}
 	}
-	canvas.addEventListener('click', onPress);
-	canvas.addEventListener('touchstart', onPress);
+
+	canvas.addEventListener('click', function(e) { onPress(e)}, false);
 }
 
 function drawHomeScreen() {

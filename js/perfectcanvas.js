@@ -32,10 +32,14 @@ function initPerfectCanvas() {
 }
 
 function resizeCanvases() {
+	var w = Math.max(document.documentElement.clientWidth, window.innerWidth || 0);
+	var h = Math.max(document.documentElement.clientHeight, window.innerHeight || 0);
 	for (var ai = 0; ai < canvases.length; ai++) {
-		canvases[ai].width = canvasParents[ai].offsetWidth-5;
+		canvases[ai].width = Math.floor((w/h)*400);
 		//the outer height must be defined explicitly!
-		canvases[ai].height = canvasParents[ai].offsetHeight; 
+		canvases[ai].height = 400;
+		canvases[ai].style.width = (w)+'px'; 
+		canvases[ai].style.height = (h)+'px'; 
 		
 		///////////////////////////////////////////
 		//let other scripts know the size changed//
