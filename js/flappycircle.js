@@ -29,7 +29,7 @@ var G = 0.002; //units/second
 var JUMP = 0.025; //units/second
 var X_VEL = 0.012; //units/second
 var WELCOME_TXT = ['Press to begin', '  a new game'];
-var LOSE_TXT = ['        Score: ', 'Press to try again!'];
+var LOSE_TXT = ['     Score: ', 'Press to try again!'];
 
 /*********************
  * working variables */
@@ -46,6 +46,7 @@ var isRunning;
 var currentScreen; //0 is home, 1 is game, 2 is lose
 var clickingEnabled; //to fix accidentally exiting the lose screen
 var currentScore;
+var bestScore;
 
 /******************
  * work functions */
@@ -59,6 +60,7 @@ function initFlappyCircle() {
 	updateCtr = 0;
 	screenVelocity = [X_VEL, 0]; //never changes
 	clickingEnabled = true;
+	bestScore = 0;
 
 	///////////////////////
 	//draw the homescreen//
@@ -137,7 +139,7 @@ function drawLoseScreen(score) {
 	var FUDGES = [300, 30, 70];
 	for (var ai = 0; ai < LOSE_TXT.length; ai++) {
 		ctx.fillText(
-			(ai === 0) ? LOSE_TXT[ai]+score : LOSE_TXT[ai], 
+			(ai === 0) ? LOSE_TXT[ai]+score+' ('+bestScore+')' : LOSE_TXT[ai], 
 			canvas.width/2 - FUDGES[0], 
 			canvas.height/2 - FUDGES[1] + ai*FUDGES[2]
 		);
@@ -181,10 +183,11 @@ function updateCanvas() {
 
 	//////////////////////
 	//draw flappy circle//
-	var canvasX = map(pos[0], xrange[0], xrange[1], 0, canvas.width);
-	var canvasY = map(pos[1], yrange[0], yrange[1], canvas.height, 0);
+	var canvasX = map(pos[0], xrange[0], xrange[1], flappyCircleRadius, canvas.width-flappyCircleRadius);
+	var canvasY = map(pos[1], yrange[0], yrange[1], canvas.height-flappyCircleRadius, flappyCircleRadius);
 	drawPoint([canvasX, canvasY], flappyCircleRadius, 'maroon');
-	currentScore = Math.floor(pos[0]/barriersEveryXUnits); //flappy circle's score
+	var f = (100/canvas.width)*(xrange[1]-xrange[0]);
+	currentScore = Math.floor((pos[0]-f)/barriersEveryXUnits);
 
 	/////////////////////
 	//draw the barriers//
@@ -219,23 +222,24 @@ function updateCanvas() {
 				inRange(canvasY, [botHalfYStart-flappyCircleRadius, 
 								  canvas.height+flappyCircleRadius])) {
 				collision = true;
+				break;
 			}
 		}
-		if (collision) {
-			isRunning = false; //they lost
-			clickingEnabled = false; //prevent rapid lose screen exiting
-			//so their most recently earned point is invalid
-			currentScore -= currentScore === 0 ? 0 : 1; //can't get a negative score
-			drawLoseScreen(currentScore);
-			return; //exit the game loop
-		}
-		
+
 		/////////////////////
 		//draw the barriers//
 		ctx.fillRect(topCornerXPos, 0, barrierWidth, topHalfLength);
 		ctx.fillRect(
 			topCornerXPos, botHalfYStart, barrierWidth, botHalfLength
 		);
+	}
+
+	if (collision) {
+		isRunning = false; //they lost
+		clickingEnabled = false; //prevent rapid lose screen exiting
+		if (currentScore > bestScore) bestScore = currentScore;
+		drawLoseScreen(currentScore);
+		return; //exit the game loop
 	}
 
 	//////////////////
