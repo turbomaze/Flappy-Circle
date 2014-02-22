@@ -3,48 +3,60 @@
 | @author Anthony  |
 | @version 1.1     |
 | @date 2014/02/19 |
-| @edit 2014/02/20 |
+| @edit 2014/02/21 |
 \******************/
 
 /**********
  * config */
 var drawEvery = 1;
-var prefDimensions = [800, 600];
 var frameRate = 30;
+var prefDimensions = [800, 600];
 
-var flappyCircleRadius = 15; //in px
 var barrierOpeningSpace = 0.3; //space of each opening as a percent
-var barrierOpeningRange = [0.05, 0.95]; //range of the vertical pos of the space
-var barrierWidth = 100; //width of the barriers in px
-var barriersEveryXUnits = 0.75;
-var startPosAsAFraction = [0.1, 0.5]; //constant location of flappy as a percent
-var percentBGLand = 0.3; //how far the land part of the BG extends
+var barriersEveryXUnits = 0.45; //how often a barrier appears
 
 /*************
  * constants */
 var MS_PER_FRAME = 1000/frameRate;
+
 var INIT_XRANGE = [0, 1];
 var INIT_YRANGE = [0, 1];
-var G = 0.002; //units/second
-var JUMP = 0.025; //units/second
+
+var G = 1.2*0.0025; //units/second
+var JUMP = 1.2*0.03125; //units/second
 var X_VEL = 0.012; //units/second
-var WELCOME_TXT = ['Press to begin', '  a new game'];
-var LOSE_TXT = ['     Score: ', 'Press to try again!'];
+
+var barrierOpeningRange = [0.05, 0.95]; //range of the vertical pos of the space
+var barrierWidth = 0.081; //width of the barriers in units
+
+var flappyCircleRadius = 0.025; //in units
+var startPosAsAFraction = [0.1, 0.5]; //constant location of flappy in units
+var percentBGLand = 0.3; //how far the land part of the BG extends
+
+var fontSize = 0.1; //as a percent of the screen's height
+
+var WELCOME_TXT = ['Press to begin', 'a new game'];
+var LOSE_TXT = ['Score: ', 'Press to try again!'];
 
 /*********************
  * working variables */
 var canvas;
 var ctx;
 var updateCtr;
+
 var xrange;
 var yrange;
 var pos;
+
 var velocity;
 var screenVelocity;
+
 var barriers;
+
 var isRunning;
 var currentScreen; //0 is home, 1 is game, 2 is lose
 var clickingEnabled; //to fix accidentally exiting the lose screen
+
 var currentScore;
 var bestScore;
 
@@ -58,6 +70,8 @@ function initFlappyCircle() {
 	canvas.height = prefDimensions[1];
 	ctx = canvas.getContext('2d');
 	updateCtr = 0;
+	xrange = INIT_XRANGE.slice(0);
+	yrange = INIT_YRANGE.slice(0);
 	screenVelocity = [X_VEL, 0]; //never changes
 	clickingEnabled = true;
 	bestScore = 0;
@@ -70,6 +84,9 @@ function initFlappyCircle() {
 	//attach event listeners//
 	canvas.addEventListener('CanvasResize', function() {
 		canvas.height = document.documentElement.clientHeight-5;
+		//change the x range to accomodate the change in dimensions
+		var u = (canvas.width/canvas.height)*(9/16);
+		xrange[1] = xrange[0] + u;
 		if (!isRunning) { //if the game isn't running
 			switch (currentScreen) {
 				case 0: drawHomeScreen(); break;
@@ -87,17 +104,18 @@ function initFlappyCircle() {
 				//////////////////////////////
 				//setup the game's variables//
 				xrange = INIT_XRANGE.slice(0);
+					var u = (canvas.width/canvas.height)*(9/16);
+					xrange[1] = xrange[0] + u;
 				yrange = INIT_YRANGE.slice(0);
-				pos = [map(startPosAsAFraction[0], 0, 1, xrange[0], xrange[1]),
-					   map(startPosAsAFraction[1], 0, 1, yrange[0], yrange[1])];
+				pos = startPosAsAFraction.slice(0);
 				velocity = [X_VEL, 0]; //units/second, x velocity shouldn't change
 				currentScore = 0;
 
 				/////////////////////
 				//generate barriers//
 				barriers = []; //[[x position, fraction up on the page] ... []]
-				var barriersUntil = 2*(xrange[1]-xrange[0]); //starting barriers
-				for (var ai = barriersEveryXUnits; ai < barriersUntil; 
+				var barriersUntil = Math.max(2*(xrange[1]-xrange[0]), barriersEveryXUnits);
+				for (var ai = barriersEveryXUnits; ai <= barriersUntil;
 					 ai+=barriersEveryXUnits) {
 					var vertDisp = getRandReal(
 						barrierOpeningRange[0], barrierOpeningRange[1]
@@ -118,30 +136,34 @@ function initFlappyCircle() {
 
 function drawHomeScreen() {
 	currentScreen = 0; //home screen
+
+	var fontPoints = Math.floor(fontSize*canvas.height);
 	drawBackground('#7DC7F5', '#62D162');
 	ctx.fillStyle = 'black';
-	ctx.font = 'bold 72px Arial';
-	var FUDGES = [230, 30, 70];
+	ctx.font = 'bold '+fontPoints+'px Arial';
+	ctx.textAlign = 'center';
 	for (var ai = 0; ai < WELCOME_TXT.length; ai++) {
 		ctx.fillText(
 			WELCOME_TXT[ai], 
-			canvas.width/2 - FUDGES[0], 
-			canvas.height/2 - FUDGES[1] + ai*FUDGES[2]
+			canvas.width/2, 
+			canvas.height/2 - fontPoints/2 + ai*fontPoints
 		);
 	}
 }
 
 function drawLoseScreen(score) {
 	currentScreen = 2; //lose screen
+
+	var fontPoints = Math.floor(fontSize*canvas.height);
 	drawBackground('#B50000', 'black');
 	ctx.fillStyle = 'white';
-	ctx.font = 'bold 72px Arial';
-	var FUDGES = [300, 30, 70];
+	ctx.font = 'bold '+fontPoints+'px Arial';
+	ctx.textAlign = 'center';
 	for (var ai = 0; ai < LOSE_TXT.length; ai++) {
 		ctx.fillText(
 			(ai === 0) ? LOSE_TXT[ai]+score+' ('+bestScore+')' : LOSE_TXT[ai], 
-			canvas.width/2 - FUDGES[0], 
-			canvas.height/2 - FUDGES[1] + ai*FUDGES[2]
+			canvas.width/2, 
+			canvas.height/2 - fontPoints/2 + ai*fontPoints
 		);
 	}
 }
@@ -183,16 +205,21 @@ function updateCanvas() {
 
 	//////////////////////
 	//draw flappy circle//
-	var canvasX = map(pos[0], xrange[0], xrange[1], flappyCircleRadius, canvas.width-flappyCircleRadius);
-	var canvasY = map(pos[1], yrange[0], yrange[1], canvas.height-flappyCircleRadius, flappyCircleRadius);
-	drawPoint([canvasX, canvasY], flappyCircleRadius, 'maroon');
-	var f = (100/canvas.width)*(xrange[1]-xrange[0]);
-	currentScore = Math.floor((pos[0]-f)/barriersEveryXUnits);
+	var flappyCircPxRadius = (flappyCircleRadius/(yrange[1]-yrange[0]))*canvas.height;
+	var canvasX = map(
+		pos[0], xrange[0], xrange[1], flappyCircPxRadius, canvas.width-flappyCircPxRadius
+	);
+	var canvasY = map(
+		pos[1], yrange[0], yrange[1], canvas.height-flappyCircPxRadius, flappyCircPxRadius
+	);
+	drawPoint([canvasX, canvasY], flappyCircPxRadius, 'maroon');
+	currentScore = Math.floor((pos[0]-barrierWidth)/barriersEveryXUnits);
 
 	/////////////////////
 	//draw the barriers//
 	var collision = false;
 	var p = (yrange[1]-yrange[0])*barrierOpeningSpace;
+	var barrierPixelWidth = (barrierWidth/(xrange[1]-xrange[0]))*canvas.width;
 	ctx.fillStyle = 'darkgreen';
 	for (var ai = 0; ai < barriers.length; ai++) {
 		/////////////////////////////////////////////////
@@ -214,13 +241,13 @@ function updateCanvas() {
 		////////////////////
 		//collision checks//
 		//if flappy circle is within the x range of this barrier
-		if (inRange(canvasX, [topCornerXPos-flappyCircleRadius, 
-							  topCornerXPos+100+flappyCircleRadius])) {
+		if (inRange(canvasX, [topCornerXPos-flappyCircPxRadius, 
+							  topCornerXPos+barrierPixelWidth+flappyCircPxRadius])) {
 			//and it's within the y ranges of either the top or the bottom
-			if (inRange(canvasY, [-flappyCircleRadius, 
-								  topHalfLength+flappyCircleRadius]) ||
-				inRange(canvasY, [botHalfYStart-flappyCircleRadius, 
-								  canvas.height+flappyCircleRadius])) {
+			if (inRange(canvasY, [-flappyCircPxRadius, 
+								  topHalfLength+flappyCircPxRadius]) ||
+				inRange(canvasY, [botHalfYStart-flappyCircPxRadius, 
+								  canvas.height+flappyCircPxRadius])) {
 				collision = true;
 				break;
 			}
@@ -228,9 +255,9 @@ function updateCanvas() {
 
 		/////////////////////
 		//draw the barriers//
-		ctx.fillRect(topCornerXPos, 0, barrierWidth, topHalfLength);
+		ctx.fillRect(topCornerXPos, 0, barrierPixelWidth, topHalfLength);
 		ctx.fillRect(
-			topCornerXPos, botHalfYStart, barrierWidth, botHalfLength
+			topCornerXPos, botHalfYStart, barrierPixelWidth, botHalfLength
 		);
 	}
 
@@ -244,9 +271,11 @@ function updateCanvas() {
 
 	//////////////////
 	//draw the score//
+	var fontPoints = Math.floor(0.75*fontSize*canvas.height); //75% the normal size
 	ctx.fillStyle = 'white';
-	ctx.font = 'bold 48px Arial';
-	ctx.fillText('Score: '+currentScore, canvas.width-250, canvas.height-50);
+	ctx.font = 'bold '+fontPoints+'px Arial';
+	ctx.textAlign = 'end';
+	ctx.fillText('Score: '+currentScore, canvas.width-10, canvas.height-15);
 	
 	/////////////////
 	//call next one//
