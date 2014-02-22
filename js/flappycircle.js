@@ -15,6 +15,8 @@ var prefDimensions = [800, 600];
 var barrierOpeningSpace = 0.3; //space of each opening as a percent
 var barriersEveryXUnits = 0.45; //how often a barrier appears
 
+var gradualSpeedup = [2E-7, 6E-7, 1E-6]; //gravity, jump, x velocity
+
 /*************
  * constants */
 var MS_PER_FRAME = 1000/frameRate;
@@ -22,15 +24,15 @@ var MS_PER_FRAME = 1000/frameRate;
 var INIT_XRANGE = [0, 1];
 var INIT_YRANGE = [0, 1];
 
-var G = 1.2*0.0025; //units/second
-var JUMP = 1.2*0.03125; //units/second
-var X_VEL = 0.012; //units/second
+var INIT_G = 0.003; //units/second
+var INIT_JUMP = 0.0375; //units/second
+var INIT_X_VEL = 0.012; //units/second
 
 var barrierOpeningRange = [0.05, 0.95]; //range of the vertical pos of the space
 var barrierWidth = 0.081; //width of the barriers in units
 
 var flappyCircleRadius = 0.025; //in units
-var startPosAsAFraction = [0.1, 0.5]; //constant location of flappy in units
+var startPosAsAFraction = [0.05, 0.5]; //constant location of flappy in units
 var percentBGLand = 0.3; //how far the land part of the BG extends
 
 var fontSize = 0.1; //as a percent of the screen's height
@@ -48,6 +50,8 @@ var xrange;
 var yrange;
 var pos;
 
+var G;
+var JUMP;
 var velocity;
 var screenVelocity;
 
@@ -72,7 +76,6 @@ function initFlappyCircle() {
 	updateCtr = 0;
 	xrange = INIT_XRANGE.slice(0);
 	yrange = INIT_YRANGE.slice(0);
-	screenVelocity = [X_VEL, 0]; //never changes
 	clickingEnabled = true;
 	bestScore = 0;
 
@@ -108,7 +111,10 @@ function initFlappyCircle() {
 					xrange[1] = xrange[0] + u;
 				yrange = INIT_YRANGE.slice(0);
 				pos = startPosAsAFraction.slice(0);
-				velocity = [X_VEL, 0]; //units/second, x velocity shouldn't change
+				G = INIT_G;
+				JUMP = INIT_JUMP;
+				velocity = [INIT_X_VEL, 0]; //units/second
+				screenVelocity = [INIT_X_VEL, 0]; //same
 				currentScore = 0;
 
 				/////////////////////
@@ -276,6 +282,13 @@ function updateCanvas() {
 	ctx.font = 'bold '+fontPoints+'px Arial';
 	ctx.textAlign = 'end';
 	ctx.fillText('Score: '+currentScore, canvas.width-10, canvas.height-15);
+
+	///////////////////////////////
+	//make it a little bit harder//
+	G += gradualSpeedup[0];
+	JUMP += gradualSpeedup[1];
+	velocity[0] += gradualSpeedup[2];
+	screenVelocity[0] += gradualSpeedup[2];
 	
 	/////////////////
 	//call next one//
