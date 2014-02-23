@@ -13,6 +13,7 @@ var frameRate = 30;
 
 var barrierOpeningSpace = 0.3; //space of each opening as a percent
 var barriersEveryXUnits = 0.45; //how often a barrier appears
+var powerupRate = 0.2; //1 in 10 barriers
 
 var gradualSpeedup = [2E-7, 6E-7, 1E-6]; //gravity, jump, x velocity
 
@@ -29,6 +30,8 @@ var INIT_X_VEL = 0.012; //units/second
 
 var barrierOpeningRange = [0.05, 0.95]; //range of the vertical pos of the space
 var barrierWidth = 0.081; //width of the barriers in units
+var coinRadius = 0.04; //in units
+var numPowerups = 1;
 
 var flappyCircleRadius = 0.025; //in units
 var startPosAsAFraction = [0.05, 0.5]; //constant location of flappy in units
@@ -55,12 +58,14 @@ var velocity;
 var screenVelocity;
 
 var barriers;
+var powerups;
 
 var isRunning;
 var currentScreen; //0 is home, 1 is game, 2 is lose
 var clickingEnabled; //to fix accidentally exiting the lose screen
 
 var currentScore;
+var bonusPoints;
 var bestScore;
 
 /******************
@@ -114,6 +119,7 @@ function initFlappyCircle() {
 				velocity = [INIT_X_VEL, 0]; //units/second
 				screenVelocity = [INIT_X_VEL, 0]; //same
 				currentScore = 0;
+				bonusPoints = 0;
 
 				/////////////////////
 				//generate barriers//
@@ -126,6 +132,7 @@ function initFlappyCircle() {
 					);
 					barriers.push([ai, vertDisp]);
 				}
+				powerups = []; //remove all the coins
 
 				currentScreen = 1; //game screen
 				updateCanvas();
@@ -177,8 +184,8 @@ function updateCanvas() {
 	updateCtr += 1;
 	if (updateCtr%drawEvery == 0) drawBackground('#7DC7F5', '#62D162');
 
-	///////////////////////////
-	//add and remove barriers//
+	////////////////////////////////////////////////
+	//add barriers/powerups and prune old barriers//
 	//there aren't any barriers or Flappy Circle is approaching the final barrier
 	var lastBarrier = barriers[barriers.length-1];
 	if (lastBarrier[0] - xrange[1] < 2*(xrange[1] - xrange[0])) { //two windows away
@@ -187,10 +194,26 @@ function updateCanvas() {
 			barrierOpeningRange[0], barrierOpeningRange[1]
 		);
 		barriers.push([xPos, vertDisp]);
+		if (Math.random() < powerupRate) { //add a coin inside this barrier
+			var type = getRandNum(0, numPowerups); //the different kinds
+			var powerupXPos = xPos + barrierWidth/2; //in the middle, in units
+			var dispFromCenter = getRandReal(
+				coinRadius-barrierOpeningSpace/2, barrierOpeningSpace/2-coinRadius
+			); //units
+			powerups.push([type, powerupXPos, vertDisp, dispFromCenter]);
+		}
 	}
 	for (var ai = 0; ai < barriers.length; ai++) {
 		if (barriers[ai][0] < xrange[0]-(xrange[1]-xrange[0])) { //too far left
 			barriers.splice(ai, 1); //then remove it
+		}
+	}
+
+	//////////////////////
+	//prune old powerups//
+	for (var ai = 0; ai < powerups.length; ai++) {
+		if (powerups[ai][1] < xrange[0]-(xrange[1]-xrange[0])) { //too far left
+			powerups.splice(ai, 1); //then remove it
 		}
 	}
 
@@ -216,14 +239,14 @@ function updateCanvas() {
 	var canvasY = map(
 		pos[1], yrange[0], yrange[1], canvas.height-flappyCircPxRadius, flappyCircPxRadius
 	);
-	drawPoint([canvasX, canvasY], flappyCircPxRadius, 'maroon');
-	currentScore = Math.floor((pos[0]-barrierWidth)/barriersEveryXUnits);
+	drawFlappyCircle([canvasX, canvasY], flappyCircPxRadius);
+	currentScore = bonusPoints+Math.floor((pos[0]-barrierWidth)/barriersEveryXUnits);
 
 	/////////////////////
 	//draw the barriers//
 	var collision = false;
-	var p = (yrange[1]-yrange[0])*barrierOpeningSpace;
 	var barrierPixelWidth = (barrierWidth/(xrange[1]-xrange[0]))*canvas.width;
+	var p = (yrange[1]-yrange[0])*barrierOpeningSpace;
 	ctx.fillStyle = 'darkgreen';
 	for (var ai = 0; ai < barriers.length; ai++) {
 		/////////////////////////////////////////////////
@@ -265,12 +288,51 @@ function updateCanvas() {
 		);
 	}
 
+	////////////////////////////////
+	//deal with barrier collisions//
 	if (collision) {
 		isRunning = false; //they lost
 		clickingEnabled = false; //prevent rapid lose screen exiting
 		if (currentScore > bestScore) bestScore = currentScore;
 		drawLoseScreen(currentScore);
 		return; //exit the game loop
+	}
+
+	/////////////////////
+	//draw the powerups//
+	var powerupCollision = -1;
+	for (var ai = 0; ai < powerups.length; ai++) {
+		////////////////////
+		//collision checks//
+		var coinX = map(
+			powerups[ai][1], xrange[0], xrange[1], 0, canvas.width
+		);
+		var coinY = map(
+			powerups[ai][2]+powerups[ai][3], yrange[0], yrange[1], canvas.height, 0
+		);
+		var coinOuterRadius = (coinRadius/(yrange[1]-yrange[0]))*canvas.height;
+		if (dist([canvasX, canvasY], [coinX, coinY]) < flappyCircPxRadius+coinOuterRadius) {
+			powerupCollision = powerups[ai][0];
+			powerups.splice(ai, 1);
+			break;
+		}
+
+		//draw the coin
+		drawCoin(powerups[ai][0], [coinX, coinY]);
+	}
+
+	////////////////////////////////
+	//deal with powerup collisions//
+	if (powerupCollision > -1) {
+		switch (powerupCollision) {
+			case 0: //extra point
+				bonusPoints += 1;
+				break;
+			case 1: //temporary invincibility
+				break;
+			case 2: //larger gaps
+				break;
+		}
 	}
 
 	//////////////////
@@ -302,6 +364,23 @@ function updateCanvas() {
 
 /********************
  * helper functions */
+function drawCoin(type, pos) {
+	var colors  = ['black', 'gray'];
+	switch (type) {
+		case 0: colors = ['#184DED', '#8CA2E6']; break;
+		case 1: colors = ['#A80F68', '#EB83C0']; break;
+		case 2: colors = ['#FFBB00', '#F5DA90']; break;
+	}
+	var outerRadius = (coinRadius/(yrange[1]-yrange[0]))*canvas.height;
+	var innerRadius = outerRadius - 5; //5 pixel border looks nice
+	drawPoint([pos[0], pos[1]], outerRadius, colors[0]);
+	drawPoint([pos[0], pos[1]], innerRadius, colors[1]);
+}
+
+function drawFlappyCircle(pos, r) {
+	drawPoint(pos, r, 'maroon');
+}
+
 function drawPoint(pos, r, color) {
 	ctx.fillStyle = color || 'rgba(255, 255, 255, 0.3)';
 	ctx.beginPath();
@@ -371,9 +450,14 @@ function inRange(n, range) { //within fudge of either boundary
 
 function tightMap(n, d1, d2, r1, r2) { //enforces boundaries
 	var raw = map(n, d1, d2, r1, r2);
-	if (raw < r1) return r1;
-	else if (raw > r2) return r2;
-	else return raw;
+	if (r1 < r2) {
+		if (raw < r1) return r1;
+		else if (raw > r2) return r2;
+	} else {
+		if (raw > r1) return r1;
+		else if (raw < r2) return r2;
+	}
+	return raw;
 }
 
 //given an n in [d1, d2], return a linearly related number in [r1, r2]
@@ -381,6 +465,10 @@ function map(n, d1, d2, r1, r2) {
 	var Rd = d2-d1;
 	var Rr = r2-r1;
 	return (Rr/Rd)*(n - d1) + r1;
+}
+
+function dist(a, b) {
+	return Math.sqrt(Math.pow(a[0]-b[0], 2) + Math.pow(a[1]-b[1], 2));
 }
 
 /***********
